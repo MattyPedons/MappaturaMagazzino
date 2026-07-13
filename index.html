@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mappa Magazzino</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#17191C; --paper:#F4F5F2; --card:#FFFFFF;
+  --accent:#E04E00; --blue:#21529E; --ok:#1E7A3C; --warn:#B3261E;
+  --line:#C9CCC5; --muted:#6B6F66;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --sans:'Archivo',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:16px;
+  padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+/* ---------- header ---------- */
+header{background:var(--ink);color:#fff;padding:12px 16px 10px;position:sticky;top:0;z-index:20}
+header .brand{display:flex;align-items:baseline;gap:8px}
+header h1{font-size:17px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+header .barsign{height:14px;width:64px;background:repeating-linear-gradient(90deg,#fff 0 2px,transparent 2px 5px,#fff 5px 9px,transparent 9px 12px,#fff 12px 13px,transparent 13px 17px);align-self:center}
+.stats{display:flex;gap:14px;margin-top:8px;font-family:var(--mono);font-size:11px;color:#B9BDB3;flex-wrap:wrap}
+.stats b{color:#fff;font-size:13px;margin-right:3px}
+/* ---------- layout ---------- */
+main{max-width:680px;margin:0 auto;padding:14px 12px}
+.card{background:var(--card);border:2px solid var(--ink);border-radius:6px;padding:14px;margin-bottom:14px}
+.card h2{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.hint{font-size:13px;color:var(--muted);line-height:1.45}
+/* ---------- scan ---------- */
+.scanwrap{border-top:10px solid transparent;border-image:repeating-linear-gradient(90deg,var(--ink) 0 3px,transparent 3px 7px,var(--ink) 7px 13px,transparent 13px 16px,var(--ink) 16px 18px,transparent 18px 24px) 10}
+.scaninput{width:100%;font-family:var(--mono);font-size:22px;font-weight:700;padding:14px 12px;
+  border:2px solid var(--ink);border-radius:6px;background:#fff;outline:none;letter-spacing:.02em}
+.scaninput:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(224,78,0,.25)}
+.scaninput::placeholder{color:#B8BBB2;font-weight:500;font-size:16px;letter-spacing:0}
+/* article panel */
+.artbox{margin-top:12px}
+.artline{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.artline:last-child{border-bottom:none}
+.artline .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;padding-top:2px;flex-shrink:0}
+.artline .v{font-family:var(--mono);font-weight:700;text-align:right;word-break:break-all}
+.postag{display:inline-block;font-family:var(--mono);font-weight:700;padding:2px 8px;border-radius:4px;border:2px solid var(--ink)}
+.postag.brandsrc{background:#FBE3D5;border-color:var(--accent)}
+.postag.artsrc{background:#DCE7F7;border-color:var(--blue)}
+.postag.none{background:#EEE;border-color:var(--muted);color:var(--muted)}
+.src{font-size:11px;color:var(--muted);margin-left:6px}
+/* buttons */
+.btn{display:block;width:100%;font-family:var(--sans);font-weight:800;font-size:16px;letter-spacing:.02em;
+  padding:15px 12px;border-radius:6px;border:2px solid var(--ink);cursor:pointer;margin-top:10px;text-align:left;line-height:1.3}
+.btn small{display:block;font-weight:500;font-size:12px;margin-top:2px;opacity:.85}
+.btn.brand{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.art{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.ghost{background:#fff;color:var(--ink)}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.danger{background:#fff;color:var(--warn);border-color:var(--warn)}
+.btn:active{transform:translateY(1px)}
+.btnrow{display:flex;gap:10px}
+.btnrow .btn{flex:1}
+/* position input */
+.posinput{width:100%;font-family:var(--mono);font-size:26px;font-weight:700;text-transform:uppercase;
+  padding:14px 12px;border:2px solid var(--blue);border-radius:6px;outline:none;margin-top:10px}
+.posinput:focus{box-shadow:0 0 0 3px rgba(33,82,158,.25)}
+.notfound{background:#FDECEA;border:2px solid var(--warn);border-radius:6px;padding:12px;margin-top:12px;font-size:14px}
+.notfound b{font-family:var(--mono)}
+/* quick add */
+.qa input{width:100%;font-family:var(--mono);font-size:16px;padding:10px;border:2px solid var(--line);border-radius:6px;margin-top:8px}
+.qa input:focus{border-color:var(--ink);outline:none}
+/* toast */
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));
+  background:var(--ink);color:#fff;padding:12px 18px;border-radius:6px;font-size:14px;font-weight:700;
+  opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;max-width:92%;text-align:center}
+#toast.show{opacity:1}
+#toast.ok{background:var(--ok)} #toast.err{background:var(--warn)}
+/* ---------- tables ---------- */
+.search{width:100%;font-family:var(--mono);font-size:16px;padding:11px;border:2px solid var(--ink);border-radius:6px;margin-bottom:12px;outline:none}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);text-align:left;padding:6px 6px;border-bottom:2px solid var(--ink)}
+td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+td.mono{font-family:var(--mono);font-weight:700}
+td.pos{font-family:var(--mono);font-weight:700;white-space:nowrap}
+.del{background:none;border:none;color:var(--warn);font-size:17px;font-weight:800;cursor:pointer;padding:2px 7px}
+.empty{padding:14px 4px;color:var(--muted);font-size:13px}
+.count{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px}
+/* ---------- tabs ---------- */
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--ink);display:flex;z-index:30;
+  padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:none;color:#9BA097;font-family:var(--sans);font-weight:800;
+  font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:14px 4px 12px;cursor:pointer;border-top:4px solid transparent}
+nav button.active{color:#fff;border-top-color:var(--accent)}
+.tab{display:none}.tab.active{display:block}
+/* file input */
+input[type=file]{display:none}
+label.filebtn{display:block}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><h1>Mappa Magazzino</h1><div class="barsign"></div></div>
+  <div class="stats">
+    <span><b id="stArt">0</b>articoli</span>
+    <span><b id="stBrand">0</b>brand posizionati</span>
+    <span><b id="stEcc">0</b>eccezioni</span>
+    <span><b id="stLoc">0</b>ubicazioni</span>
+    <span><b id="stCov">0%</b>copertura</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ TAB SCAN ============ -->
+<section id="tab-scan" class="tab active">
+  <div class="card scanwrap">
+    <h2>Scansiona articolo</h2>
+    <input id="scanInput" class="scaninput" type="text" autocomplete="off" autocapitalize="off"
+      spellcheck="false" placeholder="Spara il barcode o digita e premi Invio" enterkeyhint="go">
+    <div id="scanResult"></div>
+  </div>
+  <p class="hint">La pistola barcode in modalità tastiera (HID) scrive il codice e invia Invio automaticamente. Il campo si riattiva da solo dopo ogni operazione.</p>
+</section>
+
+<!-- ============ TAB DATABASE ============ -->
+<section id="tab-db" class="tab">
+  <input id="dbSearch" class="search" type="text" placeholder="Cerca brand, codice, barcode, posizione…">
+  <div class="card">
+    <h2>Posizioni brand</h2>
+    <div id="brandTable"></div>
+  </div>
+  <div class="card">
+    <h2>Eccezioni articolo</h2>
+    <p class="hint" style="margin-bottom:8px">Articoli posizionati fuori dalla zona del proprio brand. L'eccezione vince sempre sulla posizione brand.</p>
+    <div id="eccTable"></div>
+  </div>
+  <div class="card">
+    <h2>Ubicazioni</h2>
+    <div id="locTable"></div>
+  </div>
+  <div class="card">
+    <h2>Tutti gli articoli</h2>
+    <div id="artTable"></div>
+  </div>
+</section>
+
+<!-- ============ TAB DATI ============ -->
+<section id="tab-data" class="tab">
+  <div class="card">
+    <h2>Lista articoli</h2>
+    <p class="hint">File CSV o Excel con colonne: <b>codice articolo; barcode; marchio</b> (separatore ; , o tab — l'intestazione viene riconosciuta da sola). Gli articoli vengono aggiunti o aggiornati in base al barcode.</p>
+    <label class="filebtn"><input type="file" id="fileImport" accept=".csv,.txt,.xlsx,.xls">
+      <span class="btn ghost" style="text-align:center">📄 Importa CSV / Excel</span></label>
+    <button class="btn danger" id="btnClearArticles">Svuota lista articoli</button>
+  </div>
+  <div class="card">
+    <h2>Ubicazioni di magazzino</h2>
+    <p class="hint">File CSV o Excel con una colonna <b>posizione</b> (l'intestazione viene riconosciuta da sola; se manca, viene letta la prima colonna). L'elenco viene usato per i suggerimenti durante l'assegnazione e per segnalare posizioni non censite.</p>
+    <label class="filebtn"><input type="file" id="fileLoc" accept=".csv,.txt,.xlsx,.xls">
+      <span class="btn ghost" style="text-align:center">📍 Importa ubicazioni (CSV / Excel)</span></label>
+    <button class="btn danger" id="btnClearLoc">Svuota elenco ubicazioni</button>
+  </div>
+  <div class="card">
+    <h2>Esporta</h2>
+    <button class="btn ghost" id="btnExportCsv">⬇ Esporta posizioni (CSV)</button>
+    <button class="btn ghost" id="btnBackup">⬇ Backup completo (JSON)</button>
+    <label class="filebtn"><input type="file" id="fileRestore" accept=".json">
+      <span class="btn ghost" style="text-align:center">⬆ Ripristina backup (JSON)</span></label>
+  </div>
+  <div class="card">
+    <h2>Azzeramento</h2>
+    <button class="btn danger" id="btnClearPos">Cancella tutte le posizioni</button>
+    <button class="btn danger" id="btnClearAll">Cancella tutto (lista + posizioni)</button>
+  </div>
+  <p class="hint">I dati sono salvati solo su questo dispositivo (localStorage del browser). Usa il backup JSON per spostarli su un altro dispositivo o condividerli.</p>
+</section>
+
+</main>
+
+<div id="toast"></div>
+
+<nav>
+  <button data-tab="scan" class="active">Scansione</button>
+  <button data-tab="db">Database</button>
+  <button data-tab="data">Dati</button>
+</nav>
+
+<script>
+'use strict';
+/* ================= STATE ================= */
+const LS = {art:'wms_articles', bp:'wms_brandPos', ap:'wms_artPos', loc:'wms_locations'};
+const load = (k,d)=>{try{return JSON.parse(localStorage.getItem(k)) ?? d}catch(e){return d}};
+const save = ()=>{localStorage.setItem(LS.art,JSON.stringify(articles));
+  localStorage.setItem(LS.bp,JSON.stringify(brandPos));
+  localStorage.setItem(LS.ap,JSON.stringify(artPos));
+  localStorage.setItem(LS.loc,JSON.stringify(locations));};
+
+let articles = load(LS.art,[]);          // [{codice, barcode, marchio}]
+let brandPos = load(LS.bp,{});           // { MARCHIO_UPPER: "A-03-2" }
+let artPos   = load(LS.ap,{});           // { barcode: "B-11-4" }
+let locations = load(LS.loc,[]);         // ["A-03-2", "B-11-4", ...]
+let locSet = new Set(locations);
+let byBarcode = new Map();
+const reindex = ()=>{byBarcode = new Map(articles.map(a=>[a.barcode,a]))};
+reindex();
+
+const bkey = m => (m||'').trim().toUpperCase();
+const effPos = a => artPos[a.barcode] ? {pos:artPos[a.barcode],src:'ecc'} :
+  (brandPos[bkey(a.marchio)] ? {pos:brandPos[bkey(a.marchio)],src:'brand'} : null);
+const brandCount = m => articles.filter(a=>bkey(a.marchio)===bkey(m)).length;
+
+/* ================= HELPERS ================= */
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastT;
+function toast(msg,cls='ok'){const t=$('#toast');t.textContent=msg;t.className='show '+cls;
+  clearTimeout(toastT);toastT=setTimeout(()=>t.className='',2600);}
+function download(name,content,mime){const b=new Blob([content],{type:mime});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');
+  a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000);}
+
+function refreshStats(){
+  $('#stArt').textContent=articles.length;
+  $('#stBrand').textContent=Object.keys(brandPos).length;
+  $('#stEcc').textContent=Object.keys(artPos).length;
+  $('#stLoc').textContent=locations.length;
+  const cov=articles.length?Math.round(articles.filter(a=>effPos(a)).length/articles.length*100):0;
+  $('#stCov').textContent=cov+'%';
+}
+
+/* ================= TABS ================= */
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  $('#tab-'+b.dataset.tab).classList.add('active');
+  if(b.dataset.tab==='db') renderDB();
+  if(b.dataset.tab==='scan') focusScan();
+}));
+
+/* ================= SCAN FLOW ================= */
+const scanInput=$('#scanInput'), scanResult=$('#scanResult');
+function focusScan(){setTimeout(()=>{scanInput.focus()},80);}
+scanInput.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();const v=scanInput.value.trim();
+    scanInput.value='';if(v)handleScan(v);}
+});
+
+function posTagHTML(a){
+  const p=effPos(a);
+  if(!p) return '<span class="postag none">nessuna</span>';
+  const cls=p.src==='ecc'?'artsrc':'brandsrc';
+  const lbl=p.src==='ecc'?'eccezione articolo':'posizione brand';
+  return `<span class="postag ${cls}">${esc(p.pos)}</span><span class="src">${lbl}</span>`;
+}
+
+function handleScan(code){
+  const a=byBarcode.get(code);
+  if(!a){
+    scanResult.innerHTML=`
+      <div class="notfound">Barcode <b>${esc(code)}</b> non presente nella lista.</div>
+      <div class="qa">
+        <input id="qaCod" placeholder="Codice articolo" autocomplete="off">
+        <input id="qaMar" placeholder="Marchio" autocomplete="off">
+        <button class="btn ghost" id="qaAdd">＋ Aggiungi articolo e continua</button>
+      </div>`;
+    $('#qaAdd').addEventListener('click',()=>{
+      const cod=$('#qaCod').value.trim(), mar=$('#qaMar').value.trim();
+      if(!cod||!mar){toast('Inserisci codice e marchio','err');return;}
+      articles.push({codice:cod,barcode:code,marchio:mar});
+      reindex();save();refreshStats();
+      toast('Articolo aggiunto');handleScan(code);
+    });
+    return;
+  }
+  showArticle(a);
+}
+
+function showArticle(a){
+  const n=brandCount(a.marchio);
+  scanResult.innerHTML=`
+    <div class="artbox">
+      <div class="artline"><span class="k">Codice</span><span class="v">${esc(a.codice)}</span></div>
+      <div class="artline"><span class="k">Barcode</span><span class="v">${esc(a.barcode)}</span></div>
+      <div class="artline"><span class="k">Marchio</span><span class="v">${esc(a.marchio)}</span></div>
+      <div class="artline"><span class="k">Posizione</span><span class="v">${posTagHTML(a)}</span></div>
+    </div>
+    <button class="btn brand" id="asgBrand">Assegna posizione al BRAND ${esc(a.marchio.toUpperCase())}
+      <small>${n} articol${n===1?'o':'i'} — sovrascrive la posizione brand attuale</small></button>
+    <button class="btn art" id="asgArt">Assegna SOLO a questo articolo
+      <small>crea un'eccezione che vince sulla posizione brand</small></button>
+    ${artPos[a.barcode]?`<button class="btn ghost" id="rmEcc">Rimuovi eccezione (torna alla posizione brand)</button>`:''}
+  `;
+  $('#asgBrand').addEventListener('click',()=>askPosition(a,'brand'));
+  $('#asgArt').addEventListener('click',()=>askPosition(a,'art'));
+  const r=$('#rmEcc');
+  if(r)r.addEventListener('click',()=>{delete artPos[a.barcode];save();refreshStats();
+    toast('Eccezione rimossa');showArticle(a);focusScan();});
+}
+
+function askPosition(a,scope){
+  const label = scope==='brand'
+    ? `Posizione per tutto il brand <b>${esc(a.marchio.toUpperCase())}</b>`
+    : `Posizione solo per l'articolo <b>${esc(a.codice)}</b>`;
+  const current = scope==='brand' ? brandPos[bkey(a.marchio)] : artPos[a.barcode];
+  scanResult.innerHTML=`
+    <div class="artbox">
+      <div class="artline"><span class="k">Assegnazione</span><span class="v" style="font-family:var(--sans);font-weight:700">${label}</span></div>
+      ${current?`<div class="artline"><span class="k">Attuale</span><span class="v">${esc(current)}</span></div>`:''}
+    </div>
+    <input id="posInput" class="posinput" type="text" autocomplete="off" autocapitalize="characters"
+      spellcheck="false" placeholder="es. A-03-2" enterkeyhint="done" list="locList">
+    <datalist id="locList">${locations.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
+    <div class="btnrow">
+      <button class="btn ghost" id="posCancel">Annulla</button>
+      <button class="btn ok" id="posConfirm">Conferma</button>
+    </div>
+    <p class="hint" style="margin-top:8px">Puoi anche sparare il barcode dell'ubicazione: viene scritto qui e confermato con Invio.</p>`;
+  const pi=$('#posInput');
+  setTimeout(()=>pi.focus(),80);
+  const confirm=()=>{
+    const pos=pi.value.trim().toUpperCase();
+    if(!pos){toast('Inserisci una posizione','err');return;}
+    if(locations.length && !locSet.has(pos)){
+      if(!window.confirm(`"${pos}" non è nell'elenco ubicazioni importato.\nAssegnarla comunque?`))return;
+    }
+    if(scope==='brand'){
+      brandPos[bkey(a.marchio)]=pos;
+      toast(`${pos} → brand ${a.marchio.toUpperCase()} (${brandCount(a.marchio)} articoli)`);
+    }else{
+      artPos[a.barcode]=pos;
+      toast(`${pos} → articolo ${a.codice} (eccezione)`);
+    }
+    save();refreshStats();scanResult.innerHTML='';focusScan();
+  };
+  pi.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();confirm();}});
+  $('#posConfirm').addEventListener('click',confirm);
+  $('#posCancel').addEventListener('click',()=>{scanResult.innerHTML='';focusScan();});
+}
+
+/* ================= DATABASE VIEWS ================= */
+$('#dbSearch').addEventListener('input',renderDB);
+
+function renderDB(){
+  const q=$('#dbSearch').value.trim().toLowerCase();
+  const match=(...f)=>!q||f.some(x=>String(x??'').toLowerCase().includes(q));
+
+  // brand
+  const brands=Object.entries(brandPos).filter(([m,p])=>match(m,p))
+    .sort((x,y)=>x[0].localeCompare(y[0]));
+  $('#brandTable').innerHTML = brands.length ? `<table>
+    <tr><th>Marchio</th><th>Posizione</th><th>Art.</th><th></th></tr>
+    ${brands.map(([m,p])=>`<tr>
+      <td style="font-weight:700">${esc(m)}</td>
+      <td class="pos">${esc(p)}</td>
+      <td>${brandCount(m)}</td>
+      <td><button class="del" data-brand="${esc(m)}">✕</button></td></tr>`).join('')}
+    </table>` : `<div class="empty">Nessuna posizione brand${q?' trovata':' assegnata'}.</div>`;
+
+  // exceptions
+  const eccs=Object.entries(artPos).map(([bc,p])=>({a:byBarcode.get(bc)||{codice:'?',barcode:bc,marchio:'?'},p}))
+    .filter(({a,p})=>match(a.codice,a.barcode,a.marchio,p))
+    .sort((x,y)=>String(x.a.codice).localeCompare(String(y.a.codice)));
+  $('#eccTable').innerHTML = eccs.length ? `<table>
+    <tr><th>Codice</th><th>Marchio</th><th>Posizione</th><th></th></tr>
+    ${eccs.map(({a,p})=>`<tr>
+      <td class="mono">${esc(a.codice)}<br><span style="font-weight:500;color:var(--muted);font-size:11px">${esc(a.barcode)}</span></td>
+      <td>${esc(a.marchio)}</td>
+      <td class="pos">${esc(p)}</td>
+      <td><button class="del" data-ecc="${esc(a.barcode)}">✕</button></td></tr>`).join('')}
+    </table>` : `<div class="empty">Nessuna eccezione${q?' trovata':''}.</div>`;
+
+  // locations
+  const brandsAt={},eccCntAt={};
+  Object.entries(brandPos).forEach(([m,p])=>{(brandsAt[p]=brandsAt[p]||[]).push(m)});
+  Object.entries(artPos).forEach(([bc,p])=>{eccCntAt[p]=(eccCntAt[p]||0)+1});
+  const locs=locations.filter(p=>match(p,(brandsAt[p]||[]).join(' ')));
+  const LIMLOC=150;
+  $('#locTable').innerHTML = locs.length ? `<table>
+    <tr><th>Posizione</th><th>Contenuto</th><th></th></tr>
+    ${locs.slice(0,LIMLOC).map(p=>{
+      const parts=[];
+      if(brandsAt[p])parts.push(brandsAt[p].join(', '));
+      if(eccCntAt[p])parts.push(eccCntAt[p]+' eccezion'+(eccCntAt[p]===1?'e':'i'));
+      return `<tr><td class="pos">${esc(p)}</td>
+        <td>${parts.length?esc(parts.join(' + ')):'<span style="color:var(--muted)">libera</span>'}</td>
+        <td><button class="del" data-loc="${esc(p)}">✕</button></td></tr>`}).join('')}
+    </table>
+    <div class="count">${locs.length>LIMLOC?`Mostrate ${LIMLOC} di ${locs.length} — affina la ricerca`:`${locs.length} ubicazion${locs.length===1?'e':'i'}`}</div>`
+    : `<div class="empty">Nessuna ubicazione${q?' trovata':' — importa l&#39;elenco dalla scheda Dati'}.</div>`;
+
+  // all articles
+  const arts=articles.filter(a=>{const p=effPos(a);return match(a.codice,a.barcode,a.marchio,p&&p.pos)});
+  const LIMIT=100;
+  $('#artTable').innerHTML = arts.length ? `<table>
+    <tr><th>Codice</th><th>Marchio</th><th>Posizione</th></tr>
+    ${arts.slice(0,LIMIT).map(a=>{const p=effPos(a);return `<tr>
+      <td class="mono">${esc(a.codice)}<br><span style="font-weight:500;color:var(--muted);font-size:11px">${esc(a.barcode)}</span></td>
+      <td>${esc(a.marchio)}</td>
+      <td class="pos">${p?esc(p.pos)+(p.src==='ecc'?' <span class="src">ecc.</span>':''):'<span style="color:var(--muted)">—</span>'}</td></tr>`}).join('')}
+    </table>
+    <div class="count">${arts.length>LIMIT?`Mostrati ${LIMIT} di ${arts.length} — affina la ricerca`:`${arts.length} articol${arts.length===1?'o':'i'}`}</div>`
+    : `<div class="empty">Nessun articolo${q?' trovato':' — importa la lista dalla scheda Dati'}.</div>`;
+
+  // delete handlers
+  document.querySelectorAll('[data-brand]').forEach(b=>b.addEventListener('click',()=>{
+    if(confirm(`Rimuovere la posizione del brand ${b.dataset.brand}?`)){
+      delete brandPos[b.dataset.brand];save();refreshStats();renderDB();toast('Posizione brand rimossa');}
+  }));
+  document.querySelectorAll('[data-ecc]').forEach(b=>b.addEventListener('click',()=>{
+    if(confirm('Rimuovere questa eccezione?')){
+      delete artPos[b.dataset.ecc];save();refreshStats();renderDB();toast('Eccezione rimossa');}
+  }));
+  document.querySelectorAll('[data-loc]').forEach(b=>b.addEventListener('click',()=>{
+    if(confirm(`Rimuovere l'ubicazione ${b.dataset.loc} dall'elenco?`)){
+      locations=locations.filter(x=>x!==b.dataset.loc);locSet.delete(b.dataset.loc);
+      save();refreshStats();renderDB();toast('Ubicazione rimossa');}
+  }));
+}
+
+/* ================= IMPORT ================= */
+async function readRows(f){
+  if(/\.(xlsx|xls)$/i.test(f.name)){
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:''});
+  }
+  const text=await f.text();
+  const sep=(text.match(/;/g)||[]).length>=(text.match(/\t/g)||[]).length
+    ? ((text.match(/;/g)||[]).length? ';' : ',') : '\t';
+  return text.split(/\r?\n/).map(l=>l.split(sep));
+}
+
+$('#fileImport').addEventListener('change',async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f)return;
+  try{
+    const rows=await readRows(f);
+    let added=0,updated=0;
+    for(const r of rows){
+      if(!r||r.length<3)continue;
+      const [c,b,m]=[String(r[0]).trim(),String(r[1]).trim(),String(r[2]).trim()];
+      if(!c||!b||!m)continue;
+      const low=(c+b+m).toLowerCase();
+      if(low.includes('barcode')||low.includes('codice')||low.includes('marchio'))continue; // header
+      const ex=byBarcode.get(b);
+      if(ex){ex.codice=c;ex.marchio=m;updated++;}
+      else{articles.push({codice:c,barcode:b,marchio:m});byBarcode.set(b,articles[articles.length-1]);added++;}
+    }
+    reindex();save();refreshStats();renderDB();
+    toast(`Import: ${added} nuovi, ${updated} aggiornati`);
+  }catch(err){toast('Errore import: '+err.message,'err');}
+});
+
+$('#fileLoc').addEventListener('change',async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f)return;
+  try{
+    const rows=await readRows(f);
+    // find the column named "posizione" in the first non-empty row, else use column 0
+    let col=0,start=0;
+    const first=rows.find(r=>r&&r.some(c=>String(c).trim()));
+    if(first){
+      const idx=first.findIndex(c=>String(c).trim().toLowerCase().startsWith('posizion'));
+      if(idx>=0){col=idx;start=rows.indexOf(first)+1;}
+    }
+    let added=0;
+    for(let i=start;i<rows.length;i++){
+      const r=rows[i]; if(!r)continue;
+      const v=String(r[col]??'').trim().toUpperCase();
+      if(!v||v.startsWith('POSIZION'))continue;
+      if(!locSet.has(v)){locSet.add(v);locations.push(v);added++;}
+    }
+    locations.sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+    save();refreshStats();renderDB();
+    toast(`Ubicazioni: ${added} nuove (totale ${locations.length})`);
+  }catch(err){toast('Errore import: '+err.message,'err');}
+});
+
+$('#btnClearLoc').addEventListener('click',()=>{
+  if(confirm('Svuotare l\'elenco ubicazioni? Le posizioni già assegnate restano.')){
+    locations=[];locSet=new Set();save();refreshStats();renderDB();toast('Elenco ubicazioni svuotato');}
+});
+
+/* ================= EXPORT / BACKUP ================= */
+$('#btnExportCsv').addEventListener('click',()=>{
+  const lines=['codice;barcode;marchio;posizione;origine'];
+  for(const a of articles){const p=effPos(a);
+    lines.push([a.codice,a.barcode,a.marchio,p?p.pos:'',p?(p.src==='ecc'?'eccezione':'brand'):''].join(';'));}
+  download('posizioni_magazzino.csv','\uFEFF'+lines.join('\r\n'),'text/csv;charset=utf-8');
+});
+$('#btnBackup').addEventListener('click',()=>{
+  download('backup_magazzino.json',JSON.stringify({articles,brandPos,artPos,locations,exported:new Date().toISOString()},null,1),'application/json');
+});
+$('#fileRestore').addEventListener('change',async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f)return;
+  try{
+    const d=JSON.parse(await f.text());
+    if(!Array.isArray(d.articles))throw new Error('formato non valido');
+    articles=d.articles; brandPos=d.brandPos||{}; artPos=d.artPos||{};
+    locations=d.locations||[]; locSet=new Set(locations);
+    reindex();save();refreshStats();renderDB();toast('Backup ripristinato');
+  }catch(err){toast('Errore ripristino: '+err.message,'err');}
+});
+
+/* ================= CLEAR ================= */
+$('#btnClearArticles').addEventListener('click',()=>{
+  if(confirm('Svuotare la lista articoli? Le posizioni brand e le eccezioni restano.')){
+    articles=[];reindex();save();refreshStats();renderDB();toast('Lista articoli svuotata');}
+});
+$('#btnClearPos').addEventListener('click',()=>{
+  if(confirm('Cancellare tutte le posizioni (brand ed eccezioni)?')){
+    brandPos={};artPos={};save();refreshStats();renderDB();toast('Posizioni cancellate');}
+});
+$('#btnClearAll').addEventListener('click',()=>{
+  if(confirm('Cancellare TUTTO: lista articoli, posizioni e ubicazioni?')){
+    articles=[];brandPos={};artPos={};locations=[];locSet=new Set();
+    reindex();save();refreshStats();renderDB();toast('Dati azzerati');}
+});
+
+/* ================= INIT ================= */
+refreshStats();
+focusScan();
+</script>
+</body>
+</html>
